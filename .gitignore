@@ -38,3 +38,16 @@ next-env.d.ts
 /work/
 
 *.tsbuildinfo
+
+.dev.vars*
+
+.local-ocr/
+
+.local-host/
+
+*.app/
+
+# Local research materials include interview responses and are not app source.
+/7조_자료모음/
+
+__pycache__/

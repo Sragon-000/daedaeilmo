@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {extractPosterSchedule} from '../../lib/poster-schedule.ts';
+const lines=s=>s.split('\n').map(text=>({text,confidence:1}));
+const title='2026학년도 특강';
+const valid=extractPosterSchedule(lines('특강일시\n9월 16일(수) 15:00 (1.5H)'),title);
+assert.equal(valid.date,'2026-09-16');assert.equal(valid.end,990);assert.equal(valid.yearFromTitle,true);
+assert.equal(extractPosterSchedule(lines('신청일시\n2026.9.16. 15:00~16:30'),title),null);
+assert.equal(extractPosterSchedule(lines('특강일시\n9월 16일(목) 15:00~16:30'),title),null);
+assert.equal(extractPosterSchedule(lines('특강일시\n9월 16일(수) 15:00~16:30'),'특강'),null);
+assert.equal(extractPosterSchedule(lines('특강일시\n2026.2.30. 15:00~16:30'),title),null);
+assert.equal(extractPosterSchedule(lines('특강일시\n9월 16일~17일 15:00~16:30'),title),null);
+assert.equal(extractPosterSchedule(lines('특강일시\n9월 16일 15:00'),title),null);
+assert.equal(extractPosterSchedule(lines('특강일시\n9월 16일 15:00~16:30\n특강일시\n9월 17일 15:00~16:30'),title),null);
+const low=lines('특강일시\n9월 16일 15:00~16:30');low[1].confidence=.5;assert.equal(extractPosterSchedule(low,title).confidence,.5);
+low[1].confidence=.1;assert.equal(extractPosterSchedule(low,title),null);
+console.log('PASS: poster duration, year evidence, weekday validation, application separation, invalid/ambiguous schedules, confidence');

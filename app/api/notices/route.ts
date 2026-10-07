@@ -1,4 +1,3 @@
-import snapshots from '@/data/school-notices.json';
 import {
   parseNotices,
   sources,
@@ -55,14 +54,8 @@ export async function GET(request: Request) {
       error instanceof Error ? error.message : 'Unknown error',
     );
     return Response.json(
-      {
-        school,
-        ...snapshots[school],
-        mode: 'snapshot',
-        warning:
-          '학교 실시간 연결이 지연되어 마지막으로 가져온 실제 공지를 표시합니다.',
-      },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { error: '학교 최신 공지에 연결하지 못했어요. 학교 원문을 확인하거나 다시 시도해 주세요.' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

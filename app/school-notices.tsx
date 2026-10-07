@@ -42,8 +42,9 @@ export function SchoolNotices({ school }: { school: School }) {
             fetchedAt: '',
           });
       });
-    return () => abort.abort();
+  return () => abort.abort();
   }, [school, attempt]);
+  useEffect(() => { const timer = setInterval(() => setAttempt(n => n + 1), 60000); return () => clearInterval(timer); }, []);
   return (
     <section className="live-notices">
       <div className="section-heading">

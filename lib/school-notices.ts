@@ -1,5 +1,5 @@
 export type School = 'pcu' | 'kmu';
-export type Notice = { id: string; title: string; url: string };
+export type Notice = { id: string; title: string; url: string; postedAt?: string };
 export const sources = {
   pcu: 'https://www.pcu.ac.kr/kor/article/Notify_1',
   kmu: 'https://www.kmu.ac.kr/uni/main/page.jsp?mnu_uid=144',
@@ -20,7 +20,7 @@ function decode(text: string) {
       return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : '';
     });
 }
-export function parseNotices(html: string, school: School): Notice[] {
+export function parseNotices(html: string, school: School, limit = 15): Notice[] {
   const found = new Map<string, Notice>();
   for (const match of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
     const [, attrs, content] = match;
@@ -47,7 +47,10 @@ export function parseNotices(html: string, school: School): Notice[] {
       .replace(/\s+/g, ' ')
       .trim();
     if (title.length < 3 || title.length > 350) continue;
-    found.set(id, { id, title, url: url.href });
+    const postedAt = school === 'pcu' && match.index !== undefined
+      ? /<p\s+class=["']date["']\s*>\s*(20\d{2}-\d{2}-\d{2})\s*<\/p>/i.exec(html.slice(match.index + match[0].length, match.index + match[0].length + 3000).split('</li>')[0])?.[1]
+      : undefined;
+    found.set(id, { id, title, url: url.href, ...(postedAt ? { postedAt } : {}) });
   }
-  return [...found.values()].slice(0, 15);
+  return [...found.values()].slice(0, Math.max(0, Math.min(100, limit)));
 }
