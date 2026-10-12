@@ -66,7 +66,7 @@ class Handler(BaseHTTPRequestHandler):
      for row in rows(c,'SELECT id,title,url,source_board,payload,review_status,reviewed_at,first_seen_at,last_seen_at,override_json FROM campus_events ORDER BY last_seen_at DESC LIMIT 100'):
       source=json.loads(row.pop('payload'))
       override=json.loads(row.pop('override_json') or '{}')
-      row['fields']={key:override.get(key,source.get(key)) for key in ['schedule','application','audience','place','date','start','end','deadline']}
+      row['fields']={key:override.get(key,source.get(key)) for key in ['schedule','application','audience','place','date','start','end','deadline','activityMode','activityEndDate']}
       data.append(row)
     else:return self.respond(404,{})
    self.respond(200,data)
@@ -98,10 +98,11 @@ class Handler(BaseHTTPRequestHandler):
     elif self.path=='/api/event-review':
      event_id=data.get('id');status=data.get('status');fields=data.get('fields')
      if not isinstance(event_id,str) or not re.fullmatch(r'(Notify_1|Event_1):[0-9]{1,20}',event_id) or status not in ['unreviewed','verified','hidden'] or not isinstance(fields,dict):return self.respond(400,{'error':'행사 검수 입력을 확인해 주세요.'})
-     if set(fields)!=set(['schedule','application','audience','place','date','start','end','deadline']):return self.respond(400,{'error':'행사 필드를 확인해 주세요.'})
+     if set(fields)!=set(['schedule','application','audience','place','date','start','end','deadline','activityMode','activityEndDate']):return self.respond(400,{'error':'행사 필드를 확인해 주세요.'})
+     if fields['activityMode'] not in ['single','series','flexible','unknown']:return self.respond(400,{'error':'참여 유형을 확인해 주세요.'})
      for key in ['schedule','application','audience','place']:
       if fields[key] is not None and (not isinstance(fields[key],str) or len(fields[key])>300):return self.respond(400,{'error':'텍스트 필드를 확인해 주세요.'})
-     for key in ['date','deadline']:
+     for key in ['date','deadline','activityEndDate']:
       if fields[key] is not None:
        if not isinstance(fields[key],str) or not re.fullmatch(r'20[0-9]{2}-[0-9]{2}-[0-9]{2}',fields[key]):return self.respond(400,{'error':'날짜 형식은 YYYY-MM-DD입니다.'})
        try:datetime.date.fromisoformat(fields[key])
@@ -110,6 +111,8 @@ class Handler(BaseHTTPRequestHandler):
       if fields[key] is not None and (type(fields[key]) is not int or not 0<=fields[key]<=1440):return self.respond(400,{'error':'행사 시간을 확인해 주세요.'})
      if fields['start'] is not None or fields['end'] is not None:
       if fields['date'] is None or fields['start'] is None or fields['end'] is None or fields['end']<=fields['start']:return self.respond(400,{'error':'날짜와 시작·종료 시간을 함께 입력해 주세요.'})
+     if status=='verified' and fields['activityMode']=='single' and (fields['date'] is None or fields['start'] is None or fields['end'] is None):return self.respond(400,{'error':'단일 일정은 날짜와 시작·종료 시간이 필요해요.'})
+     if status=='verified' and fields['activityMode'] in ['series','flexible'] and (fields['date'] is not None or fields['start'] is not None or fields['end'] is not None):return self.respond(400,{'error':'복수 회차·기간 중 참여에는 단일 행사 일시를 입력하지 마세요.'})
      original=c.execute('SELECT payload FROM campus_events WHERE id=?',(event_id,)).fetchone()
      if not original:return self.respond(404,{'error':'행사를 찾지 못했어요.'})
      source=json.loads(original['payload']);override={key:value for key,value in fields.items() if value!=source.get(key)}

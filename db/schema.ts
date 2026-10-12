@@ -41,3 +41,21 @@ export const eventOpens = sqliteTable('member_event_opens', {
   eventId: text('event_id').notNull().references(() => campusEvents.id, { onDelete: 'cascade' }),
   openedAt: integer('opened_at').notNull(),
 }, table => [index('member_event_opens_time_idx').on(table.openedAt)]);
+
+export const experimentInvites = sqliteTable('experiment_invites', {
+  id: text('id').primaryKey(), participantCode: text('participant_code').notNull(),
+  tokenHash: text('token_hash').notNull(), sessionVersion: integer('session_version').notNull().default(1),
+  createdAt: integer('created_at').notNull(), expiresAt: integer('expires_at').notNull(),
+  revokedAt: integer('revoked_at'), consentedAt: integer('consented_at'),
+  availableDay: integer('available_day'), availableStart: integer('available_start'),
+  availableEnd: integer('available_end'), availabilityUpdatedAt: integer('availability_updated_at'),
+}, table => [
+  uniqueIndex('experiment_invites_code_unique').on(table.participantCode),
+  uniqueIndex('experiment_invites_token_unique').on(table.tokenHash),
+]);
+
+export const experimentActions = sqliteTable('experiment_actions', {
+  id: text('id').primaryKey(), inviteId: text('invite_id').notNull().references(() => experimentInvites.id, { onDelete: 'cascade' }),
+  action: text('action').notNull(), eventId: text('event_id'), fitAtAction: text('fit_at_action'),
+  sourceHashAtAction: text('source_hash_at_action'), createdAt: integer('created_at').notNull(),
+}, table => [index('experiment_actions_invite_time_idx').on(table.inviteId, table.action, table.createdAt)]);

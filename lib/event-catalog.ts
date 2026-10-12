@@ -7,7 +7,7 @@ type StoredEvent = {
   reviewed_at: number | null; override_json: string | null; last_seen_at: number;
 };
 
-const editable = new Set(['schedule','application','audience','place','date','start','end','deadline']);
+const editable = new Set(['schedule','application','audience','place','date','start','end','deadline','activityMode','activityEndDate']);
 function sourceHash(event: CampusEvent) {
   const { id, title, url, sourceBoard, postedAt, schedule, application, audience, place, posters, needsAttachment, contentHash } = event;
   // Hash stable source fields. OCR availability and derived date values can fluctuate.

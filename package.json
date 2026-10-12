@@ -18,7 +18,11 @@
     "host:mac:stop": "node scripts/hosting/mac.mjs stop",
     "host:mac:status": "node scripts/hosting/mac.mjs status",
     "host:mac:public": "node scripts/hosting/mac.mjs public",
-    "admin:mac": "python3 scripts/admin/launch.py"
+    "admin:mac": "python3 scripts/admin/launch.py",
+    "experiment:migrate": "python3 scripts/experiment/migrate.py",
+    "experiment:refresh": "python3 scripts/experiment/refresh.py",
+    "experiment:invite": "python3 scripts/experiment/invites.py",
+    "experiment:test": "node --experimental-strip-types scripts/experiment/test-fit.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

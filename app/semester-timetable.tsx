@@ -16,6 +16,7 @@ export default function SemesterTimetable({ courses, year, semester, onTerm, onC
     const s = minutes(start), e = minutes(end);
     if (!name.trim() || s < 540 || e > 1080 || e <= s) { setMessage('09:00–18:00 사이의 시작·종료 시간을 확인해 주세요.'); return; }
     if (courses.some(c => c.id !== editing?.id && c.day === day && s < c.end && e > c.start)) { setMessage('다른 수업과 시간이 겹쳐요.'); return; }
+    setMessage('');
     if (!authenticated) { onDemoChange([...courses.filter(c => c.id !== editing?.id), { id: editing?.id ?? Date.now(), name: name.trim(), day, start:s, end:e }]); setOpen(false); return; }
     setPending(true);
     try {

@@ -4,7 +4,7 @@ export const metadata: Metadata = {
   title: '대대일모 · 나를 위한 공강',
   icons: { icon: '/favicon.svg' },
   description:
-    '배재대학교와 계명대학교의 공강 추천, 시간표, 공간 리뷰를 체험하는 프로토타입입니다.',
+    '배재대학교의 실제 학교 활동, 직접 입력하는 시간표와 공간 리뷰 기능을 보여 주는 대대일모 앱입니다.',
 };
 export default function RootLayout({
   children,

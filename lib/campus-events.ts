@@ -5,6 +5,8 @@ export type CampusEvent = {
  date: string | null; start: number | null; end: number | null; deadline: string | null;
  posters: string[]; needsAttachment: boolean; fetchedAt: string; contentHash?: string; sourceUnavailable?: boolean;
  sourceBoard?: string; reviewStatus?: 'unreviewed'|'verified'|'hidden'; reviewedAt?: number | null;
+ activityMode?: 'single'|'series'|'flexible'|'unknown';
+ activityEndDate?: string | null;
 };
 export function eventCandidate(title: string, year = new Date().getFullYear()) {
  const years=[...title.matchAll(/(?:^|[^\d])(20\d{2})(?!\d)/g)].map(m=>Number(m[1]));
