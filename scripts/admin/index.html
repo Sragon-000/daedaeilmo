@@ -11,8 +11,8 @@
   <header><div><small>MAC SERVER MANAGER</small><h1>대대일모 서버 관리</h1><p>이 Mac 전용 관리 화면 · 외부에서는 접근할 수 없습니다.</p></div><button id="refresh">새로고침</button></header>
   <main>
     <output id="message" aria-live="polite"></output>
-    <section><h2>서버 상태</h2><div id="status" class="stats"></div><p id="address"></p><div class="actions"><button id="local">Mac 내부 시작</button><button id="public" class="primary">외부 HTTPS 시작</button><button id="stop" class="danger">서버 중지</button><button id="backup">DB 백업 (사진 제외)</button></div><p class="hint">Mac을 켜 두세요. 외부 주소는 재시작 시 변경될 수 있습니다. 상태는 5초마다 갱신됩니다.</p></section>
-    <section><h2>저장 데이터</h2><div id="counts" class="stats"></div></section>
+    <section><h2>서버 제어</h2><p id="server-summary" class="server-summary" role="status">상태를 확인하는 중…</p><div class="actions"><button id="public" class="primary">외부 HTTPS로 켜기</button><button id="local">이 Mac에서만 켜기</button><button id="stop" class="danger">서버 끄기</button></div><p id="address" class="server-address"></p><div id="status" class="stats"></div><p class="hint">외부 주소는 서버를 다시 켤 때 바뀔 수 있습니다. 상태는 5초마다 갱신됩니다. Mac을 켜 두어야 접속할 수 있습니다.</p></section>
+    <section><h2>저장 데이터</h2><div id="counts" class="stats"></div><button id="backup">DB 백업 (사진 제외)</button></section>
     <div class="columns">
       <section><h2>회원 관리</h2><input id="search" aria-label="회원 검색" placeholder="이름 또는 닉네임 검색"><p class="hint">최근 가입한 회원 최대 500명</p><div id="members"></div></section>
       <section><h2>회원 상세</h2><p id="selection">왼쪽에서 회원을 선택해 주세요.</p><form id="profile" hidden><label>이름 (실명)<input id="name" required minlength="2" maxlength="24"></label><label>닉네임<input id="nickname" required minlength="2" maxlength="24"></label><button class="primary">프로필 저장</button></form><div id="detail"></div></section>

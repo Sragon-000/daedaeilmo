@@ -1,7 +1,7 @@
 """Mac-only management API. Never routed through the public gateway."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import sqlite3, json, secrets, hmac, os, subprocess, socket, time, urllib.parse, re, datetime
+import sqlite3, json, secrets, hmac, os, subprocess, socket, time, urllib.parse, re, datetime, shutil
 ROOT=Path(__file__).resolve().parents[2]
 STATE=ROOT/'.local-host';STATE.mkdir(exist_ok=True)
 TOKEN_FILE=STATE/'admin-token'
@@ -9,7 +9,7 @@ if not TOKEN_FILE.exists():
  fd=os.open(TOKEN_FILE,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
  with os.fdopen(fd,'w') as f:f.write(secrets.token_hex(32))
 TOKEN=TOKEN_FILE.read_text().strip()
-ENV={**os.environ,'PATH':'/opt/homebrew/bin:/usr/local/bin:/Library/Frameworks/Python.framework/Versions/3.14/bin:'+os.environ.get('PATH','')}
+ENV={**os.environ,'PATH':':'.join([str(Path.home()/'.local/bin'),str(Path.home()/'.volta/bin'),'/opt/homebrew/bin','/usr/local/bin','/Library/Frameworks/Python.framework/Versions/Current/bin',os.environ.get('PATH','')])}
 def database():
  matches=[]
  for path in (ROOT/'.wrangler/state/v3/d1').glob('**/*.sqlite'):
@@ -21,11 +21,16 @@ def database():
  c=sqlite3.connect(matches[0],timeout=5);c.row_factory=sqlite3.Row;c.execute('PRAGMA foreign_keys=ON');return c
 
 def rows(c,sql,args=()):return [dict(row) for row in c.execute(sql,args).fetchall()]
-def host_running():
+def host_mode():
  try:
   pid=int((STATE/'host.pid').read_text());cmd=subprocess.check_output(['ps','-p',str(pid),'-o','command='],text=True,stderr=subprocess.DEVNULL)
-  return str(ROOT/'scripts/hosting/mac.mjs')+' run' in cmd
- except Exception:return False
+  prefix=str(ROOT/'scripts/hosting/mac.mjs')+' run'
+  if prefix+'-public' in cmd:return 'public'
+  if prefix in cmd:return 'local'
+ except Exception:pass
+ return None
+
+def host_running():return host_mode() is not None
 
 def port_ready(port):
  try:
@@ -51,10 +56,13 @@ class Handler(BaseHTTPRequestHandler):
   try:
    if url.path=='/api/health':return self.respond(200,{'ready':True})
    if url.path=='/api/status':
-    running=host_running();public=(STATE/'public-url').read_text().strip() if running and (STATE/'public-url').exists() else None
-    with database() as c:
-     counts={table:c.execute('SELECT COUNT(*) FROM '+table).fetchone()[0] for table in ['members','member_courses','member_reviews','poster_ocr','campus_events','member_event_saves','member_event_opens']}
-    return self.respond(200,{'running':running,'app':port_ready(3000),'ocr':port_ready(4318),'gateway':port_ready(3010),'publicUrl':public,'counts':counts})
+    mode=host_mode();public=(STATE/'public-url').read_text().strip() if mode=='public' and (STATE/'public-url').exists() else None
+    counts=None
+    try:
+     with database() as c:
+      counts={table:c.execute('SELECT COUNT(*) FROM '+table).fetchone()[0] for table in ['members','member_courses','member_reviews','poster_ocr','campus_events','member_event_saves','member_event_opens']}
+    except Exception:pass
+    return self.respond(200,{'running':mode is not None,'mode':mode,'app':port_ready(3000),'ocr':port_ready(4318),'gateway':port_ready(3010),'publicUrl':public,'counts':counts,'databaseReady':counts is not None})
    with database() as c:
     if url.path=='/api/members':data=rows(c,"SELECT id,name,nickname,avatar,created_at,updated_at FROM members ORDER BY created_at DESC LIMIT 500")
     elif url.path=='/api/logins':data=rows(c,"SELECT COALESCE(NULLIF(m.name,''),'프로필 설정 전') AS name, m.nickname, l.logged_at, l.expires_at, l.logged_out_at FROM school_login_events l LEFT JOIN members m ON m.subject=l.subject AND m.school=l.school ORDER BY l.logged_at DESC LIMIT 200")
@@ -82,8 +90,15 @@ class Handler(BaseHTTPRequestHandler):
     action=data.get('action');mapping={'start':'start','public':'public','stop':'stop'}
     if action not in mapping:return self.respond(400,{})
     if action!='stop' and host_running():return self.respond(409,{'error':'이미 실행 중입니다. 모드를 바꾸려면 먼저 중지해 주세요.'})
+    if not shutil.which('node',path=ENV['PATH']):return self.respond(503,{'error':'Node.js를 찾지 못했어요. 설치 상태를 확인해 주세요.'})
     r=subprocess.run(['node',str(ROOT/'scripts/hosting/mac.mjs'),mapping[action]],cwd=ROOT,env=ENV,capture_output=True,timeout=15)
-    if r.returncode:return self.respond(409,{'error':'실행하지 못했어요. 사용 중인 포트와 빌드 상태를 확인해 주세요.'})
+    if r.returncode:
+     detail=r.stderr.decode(errors='replace')
+     if 'Run npm run ocr:build first' in detail:error='OCR 실행 파일이 없습니다. 프로젝트 폴더에서 npm run ocr:build를 실행해 주세요.'
+     elif 'Run npm run build first' in detail:error='앱 빌드가 없습니다. 프로젝트 폴더에서 npm run build를 실행해 주세요.'
+     elif 'is occupied' in detail:error='서버 포트가 다른 프로그램에서 사용 중입니다. 해당 프로그램을 종료한 뒤 다시 시도해 주세요.'
+     else:error='서버를 실행하지 못했어요. .local-host/host.log를 확인해 주세요.'
+     return self.respond(409,{'error':error})
     return self.respond(200,{'message':'중지 요청을 보냈어요.' if action=='stop' else '서버를 시작합니다. 상태가 곧 갱신됩니다.'})
    if self.path=='/api/backup':
     folder=STATE/'backups';folder.mkdir(mode=0o700,exist_ok=True);path=folder/('database-'+time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(3)+'.sqlite')

@@ -8,13 +8,29 @@ async function api(path,data){const r=await fetch('/api/'+path,{method:data?'POS
 const date=value=>value?new Date(value).toLocaleString('ko-KR'):'—';
 const clock=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
 function stat(parent,label,value){const e=element('div',label,'stat');e.append(element('b',value));parent.append(e);}
-async function loadStatus(){const s=await api('status');$('status').replaceChildren();for(const [label,value] of [['실행기',s.running],['앱 서버',s.app],['OCR 포트',s.ocr],['외부 게이트웨이',s.gateway]])stat($('status'),label,value?'실행 중':'중지');$('counts').replaceChildren();for(const [key,label] of [['members','회원'],['member_courses','수업'],['member_reviews','리뷰'],['poster_ocr','OCR 결과'],['campus_events','수집 행사'],['member_event_saves','행사 저장'],['member_event_opens','원문 열기']])stat($('counts'),label,s.counts[key]);$('address').replaceChildren();if(s.publicUrl && /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(s.publicUrl)){const link=element('a',s.publicUrl);link.href=s.publicUrl;link.target='_blank';link.rel='noopener noreferrer';$('address').append(link);}else $('address').textContent='외부 주소 없음';$('local').disabled=busy||s.running;$('public').disabled=busy||s.running;$('stop').disabled=busy||!s.running;}
+async function loadStatus(){
+ const s=await api('status');
+ $('server-summary').textContent=s.mode==='public'?'● 외부 접속 중':s.mode==='local'?'● 이 Mac에서 실행 중':'○ 서버 꺼짐';
+ $('server-summary').className='server-summary '+(s.running?'on':'off');
+ $('status').replaceChildren();
+ for(const [label,value] of [['앱 서버',s.app],['OCR',s.ocr],['외부 게이트웨이',s.gateway]])stat($('status'),label,value?'연결됨':'중지');
+ $('counts').replaceChildren();
+ for(const [key,label] of [['members','회원'],['member_courses','수업'],['member_reviews','리뷰'],['poster_ocr','OCR 결과'],['campus_events','수집 행사'],['member_event_saves','행사 저장'],['member_event_opens','원문 열기']])stat($('counts'),label,s.counts?.[key]??'—');
+ if(!s.databaseReady)$('counts').prepend(element('p','DB를 아직 읽을 수 없습니다. 서버를 켠 뒤 다시 확인해 주세요.','hint'));
+ $('address').replaceChildren();
+ if(s.app){const local=element('a','이 Mac에서 앱 열기');local.href='http://localhost:3000/';local.target='_blank';local.rel='noopener noreferrer';$('address').append(local);}
+ if(s.publicUrl && /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(s.publicUrl)){
+  const link=element('a',s.publicUrl);link.href=s.publicUrl;link.target='_blank';link.rel='noopener noreferrer';
+  $('address').append(document.createElement('br'),'외부 접속 주소: ',link);
+ }else if(s.mode==='public')$('address').append(document.createElement('br'),'외부 주소를 발급받는 중…');
+ $('local').disabled=busy||s.running;$('public').disabled=busy||s.running;$('stop').disabled=busy||!s.running;
+}
 function renderMembers(){const query=$('search').value.trim();$('members').replaceChildren();for(const m of members.filter(m=>m.name.includes(query)||m.nickname.includes(query))){const b=element('button',(m.name||'프로필 설정 전')+' · @'+m.nickname,'member'+(selected?.id===m.id?' selected':''));b.onclick=()=>selectMember(m);$('members').append(b);}if(!$('members').children.length)$('members').append(element('p','회원이 없습니다.'));}
 async function loadMembers(){members=await api('members');renderMembers();}
 async function selectMember(m){selected=m;renderMembers();$('selection').textContent='가입일 '+date(m.created_at);$('profile').hidden=false;$('name').value=m.name;$('nickname').value=m.nickname;await details();}
 async function details(){if(!selected)return;const id=selected.id,data=await api('member?id='+encodeURIComponent(id));if(selected?.id!==id)return;$('detail').replaceChildren();for(const [key,title] of [['courses','시간표'],['reviews','리뷰']]){const heading=element('h3',title+' '+data[key].length+'건');$('detail').append(heading);for(const item of data[key]){const row=element('div',undefined,'record'),text=element('div');if(key==='courses'){text.append(element('p',`${item.year}년 ${item.semester}학기 · ${item.name}`),element('p',`${'월화수목금'[item.day]} ${clock(item.start)}–${clock(item.end)}`));}else{text.append(element('p',`공간 ID ${item.place} · ${item.score}점 · ${item.display_mode==='name'?'이름':'닉네임'} 표시`),element('p',item.body));}const b=element('button','삭제','danger');b.onclick=async()=>{if(prompt('이 데이터를 영구 삭제하려면 "삭제"를 입력해 주세요.')!=='삭제')return;try{await api(key==='courses'?'delete-course':'delete-review',{id:item.id,memberId:id,confirm:'삭제'});message('삭제했어요.');await details();await loadStatus();}catch(e){message(e.message);}};row.append(text,b);$('detail').append(row);}}}
 async function logins(){const data=await api('logins');$('logins').replaceChildren();for(const l of data){const tr=element('tr');for(const text of [l.name+(l.nickname?' / @'+l.nickname:''),date(l.logged_at),date(l.expires_at),l.logged_out_at?'로그아웃':l.expires_at>Date.now()?'세션 만료 전':'만료'])tr.append(element('td',text));$('logins').append(tr);}if(!data.length){const tr=element('tr'),td=element('td','기록된 로그인이 아직 없습니다.');td.colSpan=4;tr.append(td);$('logins').append(tr);}}
-async function control(action){if(action==='stop'&&!confirm('서버를 중지하면 외부 앱과 OCR 연결도 끊어집니다. 중지할까요?'))return;busy=true;try{message((await api('control',{action})).message);}catch(e){message(e.message);}finally{busy=false;await loadStatus().catch(e=>message(e.message));}}
+async function control(action){if(action==='stop'&&!confirm('서버를 중지하면 외부 앱과 OCR 연결도 끊어집니다. 중지할까요?'))return;busy=true;for(const id of ['local','public','stop'])$(id).disabled=true;try{message((await api('control',{action})).message);}catch(e){message(e.message);}finally{busy=false;await loadStatus().catch(e=>message(e.message));}}
 $('local').onclick=()=>control('start');$('public').onclick=()=>control('public');$('stop').onclick=()=>control('stop');$('search').oninput=renderMembers;
 $('backup').onclick=async()=>{try{message((await api('backup',{})).message);}catch(e){message(e.message);}};
 $('profile').onsubmit=async e=>{e.preventDefault();if(!selected)return;try{message((await api('profile',{id:selected.id,name:$('name').value,nickname:$('nickname').value})).message);await loadMembers();selected=members.find(m=>m.id===selected.id);renderMembers();}catch(err){message(err.message);}};

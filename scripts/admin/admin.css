@@ -4,3 +4,4 @@ select{width:100%;padding:11px;border:1px solid #cbd7c4;border-radius:8px;backgr
 #events{max-height:520px;overflow:auto}
 #event-original{display:inline-block;margin:0 0 16px;color:#365a36}
 #event-original[hidden]{display:none}
+.server-summary{font-size:23px;font-weight:700;margin:6px 0 20px}.server-summary.on{color:#25703e}.server-summary.off{color:#687168}.server-address{overflow-wrap:anywhere;margin:18px 0}.server-address a{font-weight:600}
