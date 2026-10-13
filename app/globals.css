@@ -1872,6 +1872,8 @@ body {
   font-weight: 800;
   text-decoration: none;
 }
+.welcome-preview-links{display:flex;flex-wrap:wrap;gap:9px}
+.welcome-preview-link.institution{background:#e9efeb;color:#365446}
 .mobile-welcome h1 {
   font-size: 42px;
   line-height: 1.23;

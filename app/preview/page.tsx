@@ -50,6 +50,7 @@ export default function PreviewPage() {
 
   return <div className="pre-shell">
     <header className="pre-header"><span className="pre-brand">대대일모<span>.</span></span><span className="pre-badge">앱 미리보기</span></header>
+    <Link className="pre-institution-link" href="/institution-preview">기관 담당자용 운영 시연 보기 <ArrowUpRight size={16}/></Link>
     <main className="pre-main">
       {tab === 'activities' && <>
         <section className="pre-hero"><p className="pre-eyebrow">배재대학교 · 실제 학교 소식</p><h1>비는 시간을<br/>새로운 기회로.</h1><p>시간표를 직접 입력하고, 학교 활동을 발견해 원문에서 신청 정보를 확인하는 앱입니다.</p><button type="button" onClick={() => setTab('timetable')}>시간표 기능 보기 <ArrowUpRight size={17}/></button></section>

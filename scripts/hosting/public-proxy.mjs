@@ -9,8 +9,8 @@ http.createServer((req,res)=>{
  if(req.headers.host!==publicUrl.host){res.writeHead(403);res.end('Forbidden');return;}
  if(req.headers['x-forwarded-proto']!=='https'){res.writeHead(308,{Location:publicUrl.origin+req.url});res.end();return;}
  const url=new URL(req.url,publicUrl),method=req.method || 'GET';
- const preview=url.pathname==='/preview' || url.pathname==='/api/preview/events';
- const allowed=url.pathname==='/' || url.pathname==='/favicon.svg' || url.pathname==='/experiment' || url.pathname==='/preview' || /^\/_next\/static\/[a-zA-Z0-9_./-]+\.(js|css|woff2?|png|svg)$/.test(url.pathname) || apis.has(url.pathname);
+ const preview=url.pathname==='/preview' || url.pathname==='/institution-preview' || url.pathname==='/api/preview/events';
+ const allowed=url.pathname==='/' || url.pathname==='/favicon.svg' || url.pathname==='/experiment' || url.pathname==='/preview' || url.pathname==='/institution-preview' || /^\/_next\/static\/[a-zA-Z0-9_./-]+\.(js|css|woff2?|png|svg)$/.test(url.pathname) || apis.has(url.pathname);
  if(!allowed || !['GET','HEAD','POST','DELETE'].includes(method)){res.writeHead(404);res.end();return;}
  if(!['GET','HEAD'].includes(method) && req.headers.origin!==publicUrl.origin){res.writeHead(403);res.end('Forbidden origin');return;}
  if(url.pathname.startsWith('/api/')){
