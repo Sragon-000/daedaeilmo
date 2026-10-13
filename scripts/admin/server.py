@@ -48,6 +48,13 @@ def preview_ready(path):
   with urllib.request.urlopen('http://127.0.0.1:3000'+path,timeout=1.5) as response:return response.status==200
  except Exception:return False
 
+def school_login_api_ready():
+ try:
+  with urllib.request.urlopen('http://127.0.0.1:3000/api/school-auth',timeout=1.5) as response:
+   data=json.load(response)
+   return response.status==200 and data.get('available') is True
+ except Exception:return False
+
 def set_preview_public_enabled(enabled):
  temporary=STATE/('institution-preview-public-'+secrets.token_hex(6)+'.tmp')
  try:
@@ -79,11 +86,13 @@ class Handler(BaseHTTPRequestHandler):
     mode=host_mode();public=(STATE/'public-url').read_text().strip() if mode=='public' and (STATE/'public-url').exists() else None
     app_ready=port_ready(3000)
     counts=None
+    last_school_login_at=None
     try:
      with database() as c:
       counts={table:c.execute('SELECT COUNT(*) FROM '+table).fetchone()[0] for table in ['members','member_courses','member_reviews','poster_ocr','campus_events','member_event_saves','member_event_opens']}
+      last_school_login_at=c.execute('SELECT MAX(logged_at) FROM school_login_events').fetchone()[0]
     except Exception:pass
-    return self.respond(200,{'running':mode is not None,'mode':mode,'app':app_ready,'ocr':port_ready(4318),'gateway':port_ready(3010),'publicUrl':public,'counts':counts,'databaseReady':counts is not None,'previews':{'studentReady':app_ready and preview_ready('/preview'),'institutionReady':app_ready and preview_ready('/institution-preview'),'institutionPublicEnabled':preview_public_enabled()}})
+    return self.respond(200,{'running':mode is not None,'mode':mode,'app':app_ready,'ocr':port_ready(4318),'gateway':port_ready(3010),'publicUrl':public,'counts':counts,'databaseReady':counts is not None,'previews':{'studentReady':app_ready and preview_ready('/preview'),'schoolLoginPageReady':app_ready and preview_ready('/'),'schoolLoginApiReady':app_ready and school_login_api_ready(),'lastSchoolLoginAt':last_school_login_at,'institutionReady':app_ready and preview_ready('/institution-preview'),'institutionPublicEnabled':preview_public_enabled()}})
    with database() as c:
     if url.path=='/api/members':data=rows(c,"SELECT id,name,nickname,avatar,created_at,updated_at FROM members ORDER BY created_at DESC LIMIT 500")
     elif url.path=='/api/logins':data=rows(c,"SELECT COALESCE(NULLIF(m.name,''),'프로필 설정 전') AS name, m.nickname, l.logged_at, l.expires_at, l.logged_out_at FROM school_login_events l LEFT JOIN members m ON m.subject=l.subject AND m.school=l.school ORDER BY l.logged_at DESC LIMIT 200")

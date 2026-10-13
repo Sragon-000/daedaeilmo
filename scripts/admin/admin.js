@@ -18,6 +18,13 @@ function renderPreviews(s){
   if(ready)previewLink(links,'이 Mac에서 열기 ↗','http://localhost:3000'+path);
   if(ready&&publicOrigin&&(kind==='student'||institutionPublicEnabled))previewLink(links,'외부 주소 열기 ↗',publicOrigin+path);
  }
+ const loginReady=previews.schoolLoginPageReady===true&&previews.schoolLoginApiReady===true;
+ $('student-login-status').textContent=loginReady?'● 배재대 로그인 화면·인증 API 준비됨':'○ 배재대 로그인 화면 또는 인증 API를 확인할 수 없음';
+ $('student-login-history').textContent=previews.lastSchoolLoginAt?'마지막 실제 로그인 성공 기록: '+date(previews.lastSchoolLoginAt):'실제 로그인 성공 기록 없음';
+ if(loginReady){
+  previewLink($('student-preview-links'),'이 Mac에서 학교 로그인 확인 ↗','http://localhost:3000/');
+  if(publicOrigin)previewLink($('student-preview-links'),'외부에서 학교 로그인 확인 ↗',publicOrigin+'/');
+ }
  $('institution-preview-exposure').textContent=institutionPublicEnabled?(publicOrigin?'외부 시연 허용 · 주소 사용 가능':'외부 시연 허용 · 외부 서버를 켜면 접속 가능'):'외부 시연 차단 · Mac 내부에서만 사용 가능';
  $('institution-preview-toggle').textContent=institutionPublicEnabled?'기관 시안 외부 공개 끄기':'기관 시안 외부 공개 켜기';
  $('institution-preview-toggle').disabled=previewBusy;
