@@ -1,9 +1,10 @@
 """Mac-only management API. Never routed through the public gateway."""
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-import sqlite3, json, secrets, hmac, os, subprocess, socket, time, urllib.parse, re, datetime, shutil
+import sqlite3, json, secrets, hmac, os, subprocess, socket, time, urllib.parse, urllib.request, re, datetime, shutil
 ROOT=Path(__file__).resolve().parents[2]
 STATE=ROOT/'.local-host';STATE.mkdir(exist_ok=True)
+PREVIEW_VISIBILITY=STATE/'institution-preview-public'
 TOKEN_FILE=STATE/'admin-token'
 if not TOKEN_FILE.exists():
  fd=os.open(TOKEN_FILE,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
@@ -37,6 +38,25 @@ def port_ready(port):
   with socket.create_connection(('localhost',port),timeout=.5):return True
  except OSError:return False
 
+def preview_public_enabled():
+ try:return PREVIEW_VISIBILITY.read_text().strip()=='enabled'
+ except FileNotFoundError:return True  # Preserve the existing public demo behavior.
+ except OSError:return False
+
+def preview_ready(path):
+ try:
+  with urllib.request.urlopen('http://127.0.0.1:3000'+path,timeout=1.5) as response:return response.status==200
+ except Exception:return False
+
+def set_preview_public_enabled(enabled):
+ temporary=STATE/('institution-preview-public-'+secrets.token_hex(6)+'.tmp')
+ try:
+  fd=os.open(temporary,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+  with os.fdopen(fd,'w') as file:file.write('enabled' if enabled else 'disabled')
+  os.replace(temporary,PREVIEW_VISIBILITY)
+ finally:
+  temporary.unlink(missing_ok=True)
+
 class Handler(BaseHTTPRequestHandler):
  def log_message(self,*args):pass
  def respond(self,status,data):
@@ -57,12 +77,13 @@ class Handler(BaseHTTPRequestHandler):
    if url.path=='/api/health':return self.respond(200,{'ready':True})
    if url.path=='/api/status':
     mode=host_mode();public=(STATE/'public-url').read_text().strip() if mode=='public' and (STATE/'public-url').exists() else None
+    app_ready=port_ready(3000)
     counts=None
     try:
      with database() as c:
       counts={table:c.execute('SELECT COUNT(*) FROM '+table).fetchone()[0] for table in ['members','member_courses','member_reviews','poster_ocr','campus_events','member_event_saves','member_event_opens']}
     except Exception:pass
-    return self.respond(200,{'running':mode is not None,'mode':mode,'app':port_ready(3000),'ocr':port_ready(4318),'gateway':port_ready(3010),'publicUrl':public,'counts':counts,'databaseReady':counts is not None})
+    return self.respond(200,{'running':mode is not None,'mode':mode,'app':app_ready,'ocr':port_ready(4318),'gateway':port_ready(3010),'publicUrl':public,'counts':counts,'databaseReady':counts is not None,'previews':{'studentReady':app_ready and preview_ready('/preview'),'institutionReady':app_ready and preview_ready('/institution-preview'),'institutionPublicEnabled':preview_public_enabled()}})
    with database() as c:
     if url.path=='/api/members':data=rows(c,"SELECT id,name,nickname,avatar,created_at,updated_at FROM members ORDER BY created_at DESC LIMIT 500")
     elif url.path=='/api/logins':data=rows(c,"SELECT COALESCE(NULLIF(m.name,''),'프로필 설정 전') AS name, m.nickname, l.logged_at, l.expires_at, l.logged_out_at FROM school_login_events l LEFT JOIN members m ON m.subject=l.subject AND m.school=l.school ORDER BY l.logged_at DESC LIMIT 200")
@@ -100,6 +121,10 @@ class Handler(BaseHTTPRequestHandler):
      else:error='서버를 실행하지 못했어요. .local-host/host.log를 확인해 주세요.'
      return self.respond(409,{'error':error})
     return self.respond(200,{'message':'중지 요청을 보냈어요.' if action=='stop' else '서버를 시작합니다. 상태가 곧 갱신됩니다.'})
+   if self.path=='/api/institution-preview':
+    if set(data)!={'publicEnabled'} or type(data['publicEnabled']) is not bool:return self.respond(400,{'error':'기관 시연 공개 설정을 확인해 주세요.'})
+    set_preview_public_enabled(data['publicEnabled'])
+    return self.respond(200,{'message':'기관 시연 외부 공개를 켰어요.' if data['publicEnabled'] else '기관 시연 외부 공개를 껐어요. Mac 내부 화면은 계속 사용할 수 있습니다.'})
    if self.path=='/api/backup':
     folder=STATE/'backups';folder.mkdir(mode=0o700,exist_ok=True);path=folder/('database-'+time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(3)+'.sqlite')
     fd=os.open(path,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600);os.close(fd)
