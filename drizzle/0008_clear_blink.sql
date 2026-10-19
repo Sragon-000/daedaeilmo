@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `institution_programs_source_unique` ON `institution_programs` (`institution_id`,`source_event_id`);
