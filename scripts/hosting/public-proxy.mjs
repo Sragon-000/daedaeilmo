@@ -12,7 +12,8 @@ function institutionPilotEnabled(){
  try{return readFileSync(institutionPilotVisibility,'utf8').trim()==='enabled';}
  catch{return false;}
 }
-const apis=new Set(['/api/school-auth','/api/profile','/api/avatar','/api/timetable','/api/events','/api/event-saves','/api/event-opens','/api/notices','/api/reviews','/api/preview/events','/api/programs','/api/applications','/api/institution-auth','/api/institution-programs','/api/institution-applications']);
+const institutionApis=['/api/institution-auth','/api/institution-programs','/api/institution-applications','/api/institution-staff','/api/institution-contacts','/api/institution-audit','/api/institution-export'];
+const apis=new Set(['/api/school-auth','/api/profile','/api/avatar','/api/timetable','/api/events','/api/event-saves','/api/event-opens','/api/notices','/api/reviews','/api/preview/events','/api/programs','/api/applications',...institutionApis]);
 const rates=new Map();
 http.createServer((req,res)=>{
  let publicUrl;try{publicUrl=new URL(readFileSync(resolve('.local-host/public-url'),'utf8').trim());}catch{res.writeHead(503);res.end('Starting');return;}
@@ -20,7 +21,7 @@ http.createServer((req,res)=>{
  if(req.headers['x-forwarded-proto']!=='https'){res.writeHead(308,{Location:publicUrl.origin+req.url});res.end();return;}
  const url=new URL(req.url,publicUrl),method=req.method || 'GET';
  if(url.pathname==='/institution-preview' && !institutionPreviewEnabled()){res.writeHead(404);res.end();return;}
- if((url.pathname==='/institution' || ['/api/programs','/api/applications','/api/institution-auth','/api/institution-programs','/api/institution-applications'].includes(url.pathname)) && !institutionPilotEnabled()){res.writeHead(404);res.end();return;}
+ if((url.pathname==='/institution' || ['/api/programs','/api/applications',...institutionApis].includes(url.pathname)) && !institutionPilotEnabled()){res.writeHead(404);res.end();return;}
  const preview=url.pathname==='/preview' || url.pathname==='/institution-preview' || url.pathname==='/api/preview/events';
  const allowed=url.pathname==='/' || url.pathname==='/favicon.svg' || url.pathname==='/experiment' || url.pathname==='/preview' || url.pathname==='/institution-preview' || url.pathname==='/institution' || /^\/_next\/static\/[a-zA-Z0-9_./-]+\.(js|css|woff2?|png|svg)$/.test(url.pathname) || apis.has(url.pathname);
  if(!allowed || !['GET','HEAD','POST','DELETE','PATCH'].includes(method)){res.writeHead(404);res.end();return;}

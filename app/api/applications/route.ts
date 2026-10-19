@@ -25,12 +25,12 @@ export async function POST(request: Request) {
     const part=(name:string)=>kst.find(x=>x.type===name)?.value||'';
     const today=`${part('year')}-${part('month')}-${part('day')}`,minute=Number(part('hour'))*60+Number(part('minute'));
     if (program.event_date && (program.event_date<today || program.event_date===today && program.end_minute!==null && minute>=program.end_minute)) return reply({message:'종료된 프로그램입니다.'},409);
-    if (program.accepted_count>=program.capacity) return reply({message:'정원이 찼습니다.'},409);
-    await db.prepare(`INSERT INTO program_applications (id,program_id,member_id,status,created_at,updated_at) VALUES (?,?,?,'applied',?,?)
-      ON CONFLICT(member_id,program_id) DO UPDATE SET status='applied',updated_at=excluded.updated_at,acknowledged_at=NULL WHERE program_applications.status='cancelled_by_student'`)
-      .bind(randomUUID(),programId,member.id,now,now).run();
+    const nextStatus=program.accepted_count>=program.capacity?'waitlisted':'applied';
+    const changed=await db.prepare(`INSERT INTO program_applications (id,program_id,member_id,status,created_at,updated_at) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(member_id,program_id) DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at,acknowledged_at=NULL,response_due_at=NULL WHERE program_applications.status='cancelled_by_student'`)
+      .bind(randomUUID(),programId,member.id,nextStatus,now,now).run();
     const row=await db.prepare('SELECT id,status FROM program_applications WHERE program_id=? AND member_id=?').bind(programId,member.id).first<{id:string;status:string}>();
-    if (row?.status==='applied') await db.prepare('INSERT INTO program_audit (id,program_id,application_id,actor,action,created_at) VALUES (?,?,?,?,?,?)').bind(randomUUID(),programId,row.id,'student','applied',now).run();
+    if (changed.meta.changes && row) await db.prepare('INSERT INTO program_audit (id,program_id,application_id,actor,action,created_at) VALUES (?,?,?,?,?,?)').bind(randomUUID(),programId,row.id,'student',row.status,now).run();
     return reply({status:row?.status});
   } catch { return reply({message:'신청을 저장하지 못했어요.'},503); }
 }
@@ -44,10 +44,10 @@ export async function PATCH(request: Request) {
     const member=await ensureMember(session),db=getDb(),now=Date.now();
     const row=await db.prepare('SELECT id,status FROM program_applications WHERE program_id=? AND member_id=?').bind(input.programId,member.id).first<{id:string;status:string}>();
     if (!row) return reply({},404);
-    const allowed=input.action==='cancel' ? ['applied','accepted'].includes(row.status) : row.status==='accepted';
+    const allowed=input.action==='cancel' ? ['applied','waitlisted','accepted'].includes(row.status) : row.status==='accepted';
     if (!allowed) return reply({message:'현재 상태에서는 변경할 수 없어요.'},409);
     const result=input.action==='cancel'
-      ? await db.prepare("UPDATE program_applications SET status='cancelled_by_student',updated_at=?,acknowledged_at=NULL WHERE id=? AND status IN ('applied','accepted')").bind(now,row.id).run()
+      ? await db.prepare("UPDATE program_applications SET status='cancelled_by_student',updated_at=?,acknowledged_at=NULL,response_due_at=NULL WHERE id=? AND status IN ('applied','waitlisted','accepted')").bind(now,row.id).run()
       : await db.prepare("UPDATE program_applications SET acknowledged_at=?,updated_at=? WHERE id=? AND status='accepted' AND acknowledged_at IS NULL").bind(now,now,row.id).run();
     if (!result.meta.changes) return reply({message:'상태가 이미 변경됐어요. 새로고침해 주세요.'},409);
     await db.prepare('INSERT INTO program_audit (id,program_id,application_id,actor,action,created_at) VALUES (?,?,?,?,?,?)').bind(randomUUID(),input.programId,row.id,'student',input.action,now).run();

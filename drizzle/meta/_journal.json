@@ -64,6 +64,13 @@
       "when": 1792373858217,
       "tag": "0008_clear_blink",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792382881223,
+      "tag": "0009_gigantic_toad_men",
+      "breakpoints": true
     }
   ]
 }

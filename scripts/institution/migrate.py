@@ -18,7 +18,16 @@ path = matches[0]
 with sqlite3.connect(path) as connection:
     missing = [n for n in ('institution_programs', 'institution_programs_source_unique')
                if not connection.execute("SELECT name FROM sqlite_master WHERE name=?", (n,)).fetchone()]
-if missing:
+    new_objects = [connection.execute("SELECT name FROM sqlite_master WHERE name=?", (n,)).fetchone() is not None
+                   for n in ('institution_staff', 'application_contacts')]
+    new_objects.extend([
+        any(row[1] == 'response_hours' for row in connection.execute('PRAGMA table_info(institution_programs)')) if 'institution_programs' not in missing else False,
+        any(row[1] == 'response_due_at' for row in connection.execute('PRAGMA table_info(program_applications)')),
+    ])
+    if any(new_objects) and not all(new_objects):
+        raise SystemExit('기관 확장 스키마가 일부만 적용되어 있습니다. 백업 후 수동 점검이 필요합니다.')
+    needs9 = not all(new_objects)
+if missing or needs9:
     backup_dir = ROOT / '.local-host/backups'
     backup_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     backup = backup_dir / ('institution-pre-migration-' + time.strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3) + '.sqlite')
@@ -31,6 +40,9 @@ if missing:
             connection.executescript('BEGIN IMMEDIATE;\n' + sql + '\nCOMMIT;')
         if 'institution_programs_source_unique' in missing:
             sql = (ROOT / 'drizzle/0008_clear_blink.sql').read_text().replace('--> statement-breakpoint', '\n')
+            connection.executescript('BEGIN IMMEDIATE;\n' + sql + '\nCOMMIT;')
+        if needs9:
+            sql = (ROOT / 'drizzle/0009_gigantic_toad_men.sql').read_text().replace('--> statement-breakpoint', '\n')
             connection.executescript('BEGIN IMMEDIATE;\n' + sql + '\nCOMMIT;')
     print('DB 백업 및 기관 테이블 준비 완료:', backup)
 else:

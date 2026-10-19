@@ -67,6 +67,7 @@ export const institutionPrograms = sqliteTable('institution_programs', {
   eventDate: text('event_date'), startMinute: integer('start_minute'), endMinute: integer('end_minute'),
   capacity: integer('capacity').notNull(), absenceConfirmed: integer('absence_confirmed').notNull().default(0),
   absenceEvidence: text('absence_evidence').notNull().default(''), status: text('status').notNull().default('draft'),
+  responseHours: integer('response_hours').notNull().default(48),
   createdAt: integer('created_at').notNull(), updatedAt: integer('updated_at').notNull(),
 }, table => [index('institution_programs_school_status_idx').on(table.school, table.status), index('institution_programs_owner_idx').on(table.institutionId), uniqueIndex('institution_programs_source_unique').on(table.institutionId, table.sourceEventId)]);
 
@@ -74,7 +75,20 @@ export const programApplications = sqliteTable('program_applications', {
   id: text('id').primaryKey(), programId: text('program_id').notNull().references(() => institutionPrograms.id),
   memberId: text('member_id').notNull().references(() => members.id), status: text('status').notNull(),
   createdAt: integer('created_at').notNull(), updatedAt: integer('updated_at').notNull(), acknowledgedAt: integer('acknowledged_at'),
+  responseDueAt: integer('response_due_at'),
 }, table => [uniqueIndex('program_applications_member_program_unique').on(table.memberId, table.programId), index('program_applications_program_status_idx').on(table.programId, table.status)]);
+
+export const institutionStaff = sqliteTable('institution_staff', {
+  id: text('id').primaryKey(), institutionId: text('institution_id').notNull(),
+  label: text('label').notNull(), role: text('role').notNull(), keyHash: text('key_hash').notNull(),
+  sessionVersion: integer('session_version').notNull().default(1), revokedAt: integer('revoked_at'),
+  createdAt: integer('created_at').notNull(), lastLoginAt: integer('last_login_at'),
+}, table => [uniqueIndex('institution_staff_key_unique').on(table.keyHash), index('institution_staff_owner_idx').on(table.institutionId, table.revokedAt)]);
+
+export const applicationContacts = sqliteTable('application_contacts', {
+  id: text('id').primaryKey(), applicationId: text('application_id').notNull().references(() => programApplications.id),
+  staffId: text('staff_id'), channel: text('channel').notNull(), note: text('note').notNull(), createdAt: integer('created_at').notNull(),
+}, table => [index('application_contacts_application_time_idx').on(table.applicationId, table.createdAt)]);
 
 export const programAudit = sqliteTable('program_audit', {
   id: text('id').primaryKey(), programId: text('program_id').notNull(), applicationId: text('application_id'),
