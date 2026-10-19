@@ -3,6 +3,7 @@ import { getDb } from '@/db';
 import { auditActor, canOperate, institutionActor } from '@/lib/institution-auth';
 import { ownOrigin, reply, smallJson } from '@/lib/member-server';
 import type { CampusEvent } from '@/lib/campus-events';
+import { applyStoredEvent } from '@/lib/event-catalog';
 
 type Input = Record<string, unknown>;
 const trimmed = (value: unknown, max: number) => typeof value === 'string' && value.trim().length <= max ? value.trim() : null;
@@ -27,11 +28,11 @@ export async function GET(request: Request) {
         (SELECT COUNT(*) FROM program_applications a WHERE a.program_id=p.id AND a.status='accepted' AND a.acknowledged_at IS NULL AND a.response_due_at<?) AS overdue_count
         FROM institution_programs p LEFT JOIN campus_events e ON e.id=p.source_event_id
         WHERE p.institution_id=? ORDER BY p.updated_at DESC LIMIT 100`).bind(Date.now(),actor.institutionId).all(),
-      db.prepare(`SELECT id,title,payload,review_status FROM campus_events WHERE school='pcu' AND review_status!='hidden' ORDER BY last_seen_at DESC LIMIT 60`).all<{id:string;title:string;payload:string;review_status:string}>(),
+      db.prepare(`SELECT id,payload,review_status,reviewed_at,override_json,last_seen_at FROM campus_events WHERE school='pcu' AND review_status!='hidden' ORDER BY last_seen_at DESC LIMIT 60`).all<{id:string;payload:string;review_status:'unreviewed'|'verified'|'hidden';reviewed_at:number|null;override_json:string|null;last_seen_at:number}>(),
     ]);
     return reply({ programs: programs.results, notices: notices.results.map(n => {
-      let event: Partial<CampusEvent> = {}; try { event = JSON.parse(n.payload) as CampusEvent; } catch {}
-      return { id:n.id, title:n.title, url:event.url, schedule:event.schedule, audience:event.audience, place:event.place, date:event.date, start:event.start, end:event.end, reviewStatus:n.review_status };
+      const event = applyStoredEvent(n);
+      return { id:n.id, title:event.title, url:event.url, schedule:event.schedule, audience:event.audience, place:event.place, date:event.date, start:event.start, end:event.end, reviewStatus:n.review_status };
     }) });
   } catch { return reply({ message:'기관 자료를 불러오지 못했어요.' }, 503); }
 }
@@ -45,9 +46,9 @@ export async function POST(request: Request) {
   try {
     const db = getDb(); let source: CampusEvent | null = null;
     if (sourceEventId) {
-      const row = await db.prepare("SELECT payload FROM campus_events WHERE id=? AND school='pcu' AND review_status!='hidden'").bind(sourceEventId).first<{payload:string}>();
+      const row = await db.prepare("SELECT id,payload,review_status,reviewed_at,override_json,last_seen_at FROM campus_events WHERE id=? AND school='pcu' AND review_status!='hidden'").bind(sourceEventId).first<{id:string;payload:string;review_status:'unreviewed'|'verified'|'hidden';reviewed_at:number|null;override_json:string|null;last_seen_at:number}>();
       if (!row) return reply({message:'공식 공지를 찾지 못했어요.'},404);
-      source = JSON.parse(row.payload) as CampusEvent;
+      source = applyStoredEvent(row);
     }
     const title = trimmed(input.title ?? source?.title, 160), description = trimmed(input.description ?? source?.schedule ?? '', 1500),
       eligibility = trimmed(input.eligibility ?? source?.audience ?? '', 500), place = trimmed(input.place ?? source?.place ?? '', 160);
